@@ -1,6 +1,6 @@
 {
   "name": "obsidian-novel-tracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Novel plot tracking plugin for Obsidian",
   "main": "main.js",
   "scripts": {

@@ -204,24 +204,78 @@ ${ctx.chapterText}`;
     messages: [{ role: "user", content: user }],
     jsonMode: true,
   });
-  const raw = extractJson(reply) as Partial<TrackResult>;
-  const result: TrackResult = {
-    summary: raw.summary ?? "",
-    newIntel: raw.newIntel ?? [],
-    newSettings: raw.newSettings ?? [],
-    characterUpdates: raw.characterUpdates ?? [],
-    newTraces: raw.newTraces ?? [],
-    newForeshadow: raw.newForeshadow ?? [],
-    resolvedForeshadow: raw.resolvedForeshadow ?? [],
-    usedPlotIdeas: raw.usedPlotIdeas ?? [],
-    storyTime: raw.storyTime ?? null,
-    knowledgeUpdates: raw.knowledgeUpdates ?? [],
-    beatsHit: raw.beatsHit ?? [],
-    beatsMissed: raw.beatsMissed ?? [],
-    newNPCs: raw.newNPCs ?? [],
-    appearingCharacters: raw.appearingCharacters ?? [],
+  const raw = extractJson(reply) as Record<string, unknown>;
+  return { result: sanitizeTrackResult(raw), ctx };
+}
+
+/** 把值安全转成字符串：null/undefined → ""，其他非字符串 String() 化 */
+function s(v: unknown): string {
+  if (v == null) return "";
+  return typeof v === "string" ? v : String(v);
+}
+
+/**
+ * 清洗模型返回的 JSON：模型经常在未知字段上返回 null，
+ * 直接使用会在写表格时抛 "Cannot read properties of null"。
+ * 全部字段强制转字符串，缺关键字段的条目丢弃。
+ */
+export function sanitizeTrackResult(raw: Record<string, unknown>): TrackResult {
+  const arr = (v: unknown): Record<string, unknown>[] =>
+    Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : [];
+  const strArr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map(s).filter(Boolean) : [];
+
+  const st = raw.storyTime as Record<string, unknown> | null | undefined;
+  const storyTime =
+    st && typeof st === "object" && (s(st.date) || s(st.events))
+      ? { date: s(st.date), events: s(st.events) }
+      : null;
+
+  return {
+    summary: s(raw.summary),
+    newIntel: arr(raw.newIntel)
+      .map((i) => ({ owner: s(i.owner), content: s(i.content), inference: s(i.inference) }))
+      .filter((i) => i.content),
+    newSettings: arr(raw.newSettings)
+      .map((i) => ({ category: s(i.category) || "其他", content: s(i.content) }))
+      .filter((i) => i.content),
+    characterUpdates: arr(raw.characterUpdates)
+      .map((i) => ({ name: s(i.name), update: s(i.update) }))
+      .filter((i) => i.name && i.update),
+    newTraces: arr(raw.newTraces)
+      .map((i) => ({
+        character: s(i.character),
+        trace: s(i.trace),
+        type: s(i.type) || "未知",
+        source: s(i.source),
+        permanent: s(i.permanent) || "未知",
+      }))
+      .filter((i) => i.character && i.trace),
+    newForeshadow: arr(raw.newForeshadow)
+      .map((i) => ({ description: s(i.description), note: s(i.note) }))
+      .filter((i) => i.description),
+    resolvedForeshadow: arr(raw.resolvedForeshadow)
+      .map((i) => ({ description: s(i.description) }))
+      .filter((i) => i.description),
+    usedPlotIdeas: arr(raw.usedPlotIdeas)
+      .map((i) => ({ idea: s(i.idea) }))
+      .filter((i) => i.idea),
+    storyTime,
+    knowledgeUpdates: arr(raw.knowledgeUpdates)
+      .map((i) => ({ fact: s(i.fact), character: s(i.character), state: s(i.state) }))
+      .filter((i) => i.fact && i.character && i.state),
+    beatsHit: strArr(raw.beatsHit),
+    beatsMissed: strArr(raw.beatsMissed),
+    newNPCs: arr(raw.newNPCs)
+      .map((i) => ({
+        name: s(i.name),
+        identity: s(i.identity),
+        relation: s(i.relation),
+        keyInfo: s(i.keyInfo),
+      }))
+      .filter((i) => i.name),
+    appearingCharacters: strArr(raw.appearingCharacters),
   };
-  return { result, ctx };
 }
 
 /* ------------------------------------------------------------------ */

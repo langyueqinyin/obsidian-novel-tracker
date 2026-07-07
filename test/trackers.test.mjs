@@ -93,6 +93,15 @@ test("实写日期偏离计划时报偏差", () => {
   assert.equal(entries.find((e) => e.chapter === "第34章").date, "2007-02-22");
 });
 
+test("表格写入容忍 null 字段（回归：模型 JSON 里的 null 导致整章写入失败）", () => {
+  const { content } = T.upsertTimeline(timeline, {
+    chapter: "第37章",
+    date: null,
+    events: null,
+  });
+  assert.ok(content.includes("| 第37章 |  |  |  | 已写 |"));
+});
+
 test("新章节直接追加", () => {
   const { content } = T.upsertTimeline(timeline, {
     chapter: "第36章",

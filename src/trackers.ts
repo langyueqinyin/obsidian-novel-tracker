@@ -74,8 +74,10 @@ export function findTableByFirstHeader(
   );
 }
 
-function makeRow(cells: string[]): string {
-  return `| ${cells.map((c) => c.replace(/\|/g, "／").replace(/\n/g, " ")).join(" | ")} |`;
+function makeRow(cells: (string | null | undefined)[]): string {
+  return `| ${cells
+    .map((c) => String(c ?? "").replace(/\|/g, "／").replace(/\n/g, " "))
+    .join(" | ")} |`;
 }
 
 /** 在指定表格末尾追加行，返回新内容 */
