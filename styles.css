@@ -1,0 +1,85 @@
+/* Novel Tracker */
+
+.novel-tracker-review-modal {
+  width: 640px;
+  max-width: 90vw;
+}
+.novel-tracker-review-modal .modal-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.novel-tracker-issue {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.novel-tracker-suggest-desc {
+  color: var(--text-muted);
+  display: block;
+}
+
+.novel-tracker-quick-input {
+  width: 100%;
+  resize: vertical;
+}
+
+/* 对话侧边栏 */
+.novel-tracker-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.novel-tracker-chat-header {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+.novel-tracker-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.novel-tracker-msg {
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+.novel-tracker-msg-user {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  align-self: flex-end;
+  max-width: 85%;
+}
+.novel-tracker-msg-assistant {
+  background: var(--background-secondary);
+  align-self: flex-start;
+  max-width: 95%;
+}
+.novel-tracker-chat-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.novel-tracker-chat-actions button {
+  font-size: var(--font-ui-smaller);
+}
+.novel-tracker-chat-inputwrap {
+  padding: 8px;
+  flex-shrink: 0;
+}
+.novel-tracker-chat-inputwrap textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.novel-tracker-briefing div {
+  padding: 1px 0;
+}

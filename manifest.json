@@ -1,0 +1,9 @@
+{
+  "id": "novel-tracker",
+  "name": "Novel Tracker",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "长篇小说剧情追踪：伏笔登记、知情差矩阵、时间线校验、灵感整理、一键 Track 章节。",
+  "author": "Lucia",
+  "isDesktopOnly": false
+}
