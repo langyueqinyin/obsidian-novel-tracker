@@ -38,6 +38,7 @@ class EnneagramPickModal extends SuggestModal<string> {
     private format: "table" | "list"
   ) {
     super(plugin.app);
+    this.modalEl.addClass("novel-tracker-enneagram-modal");
     this.setPlaceholder(`${mbti} 推荐：${recommended.join(" / ")}（也可选其他任意侧翼）`);
   }
 
@@ -52,9 +53,12 @@ class EnneagramPickModal extends SuggestModal<string> {
 
   renderSuggestion(type: string, el: HTMLElement) {
     const isRec = this.recommended.includes(type);
-    el.createEl("div", { text: isRec ? `${type}（${this.mbti} 常见匹配）` : type });
+    el.createEl("div", {
+      text: isRec ? `${type}（${this.mbti} 常见匹配）` : type,
+      cls: "novel-tracker-suggest-title",
+    });
     el.createEl("small", {
-      text: ENNEAGRAM_DESC[type].slice(0, 40) + "…",
+      text: ENNEAGRAM_DESC[type],
       cls: "novel-tracker-suggest-desc",
     });
   }

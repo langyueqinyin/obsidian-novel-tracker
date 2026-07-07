@@ -14,9 +14,29 @@
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
+.novel-tracker-suggest-title {
+  font-weight: 600;
+}
+
 .novel-tracker-suggest-desc {
   color: var(--text-muted);
   display: block;
+  white-space: normal;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* 九型简述条目本身比默认的建议行高，撑开一点让长文本不显挤（仅限本插件的九型选择弹窗） */
+.novel-tracker-enneagram-modal {
+  width: 620px;
+  max-width: 90vw;
+}
+.novel-tracker-enneagram-modal .prompt-results {
+  max-height: 70vh;
+}
+.novel-tracker-enneagram-modal .suggestion-item {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .novel-tracker-quick-input {
