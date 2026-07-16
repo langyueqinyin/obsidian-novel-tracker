@@ -205,9 +205,10 @@ export class NovelChatView extends ItemView {
 
   /** 清空当前串重新开始（保留上下文选项设置） */
   private async restartThread() {
-    if (!this.thread || !this.project) return;
+    if (!this.thread) return;
     const t = this.thread;
     if (t.mode === "inspiration") {
+      if (!this.project) return;
       delete this.store[t.key];
       await this.persist();
       await this.openInspiration(this.project);
@@ -305,7 +306,8 @@ export class NovelChatView extends ItemView {
   }
 
   private async send(userText: string) {
-    if (this.busy || !this.thread || !this.project) return;
+    // 注意：不能要求 this.project——无项目模式（单文件小说/任意笔记）也要能发
+    if (this.busy || !this.thread) return;
     const text = userText.trim();
     if (!text) return;
     const t = this.thread;
