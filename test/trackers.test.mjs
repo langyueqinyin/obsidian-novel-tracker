@@ -168,6 +168,14 @@ test("踩点核对：命中+漏踩滚入下章", () => {
   assert.ok(/## 第35章[\s\S]*二道贩子交代背景\s*\|\s*待踩\s*\|\s*自第34章滚入/.test(updated));
 });
 
+test("追加踩点：已有小节追加行，无小节新建", () => {
+  let updated = T.addBeat(beats, "第34章", "新加的情节点", "来自聊天");
+  assert.ok(/新加的情节点\s*\|\s*待踩\s*\|\s*来自聊天/.test(updated));
+  updated = T.addBeat(updated, "第36章", "全新小节的点");
+  assert.ok(updated.includes("## 第36章"));
+  assert.ok(/全新小节的点\s*\|\s*待踩/.test(updated));
+});
+
 /* --- 灵感收集箱 --- */
 test("灵感速记与归档", () => {
   let inbox = "# 灵感收集箱\n";

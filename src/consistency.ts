@@ -52,6 +52,11 @@ export async function runConsistencyCheck(
       cards.push(`### ${cf.basename}\n${content.slice(0, 2500)}`);
     }
 
+    const ignores = plugin.settings.consistencyIgnores[project.root] ?? [];
+    const ignoreBlock = ignores.length
+      ? `\n# 作者已确认非问题（这些点作者知情且是有意为之，不要再报告）\n${ignores.map((i) => `- ${i}`).join("\n")}\n`
+      : "";
+
     const user = `# 项目档案（bible）
 ${bible.slice(0, 5000)}
 
@@ -63,7 +68,7 @@ ${timeline.slice(0, 3000)}
 
 # 角色资料
 ${cards.join("\n\n").slice(0, 8000)}
-
+${ignoreBlock}
 # 待校对章节（${chapterLabel(chapter)}）
 ${chapterText}`;
 
@@ -109,8 +114,24 @@ class ConsistencyResultModal extends Modal {
     );
     for (const issue of sorted) {
       const item = contentEl.createDiv({ cls: "novel-tracker-issue" });
-      item.createEl("strong", {
+      const head = item.createDiv({ cls: "novel-tracker-issue-head" });
+      head.createEl("strong", {
         text: `[${issue.severity}] ${issue.issue}`,
+      });
+      const ignoreBtn = head.createEl("button", {
+        text: "忽略",
+        cls: "novel-tracker-ignore-btn",
+        attr: { "aria-label": "标记为有意为之，之后的检查不再报这一条" },
+      });
+      ignoreBtn.addEventListener("click", async () => {
+        const key = this.project.root;
+        const list = (this.plugin.settings.consistencyIgnores[key] ??= []);
+        if (!list.includes(issue.issue)) list.push(issue.issue);
+        // 忽略清单只保留最近 50 条，防止 prompt 无限膨胀
+        if (list.length > 50) list.splice(0, list.length - 50);
+        await this.plugin.saveSettings();
+        item.remove();
+        new Notice("已记住：之后的检查不再报这一条");
       });
       item.createEl("div", { text: `位置：${issue.location}`, cls: "setting-item-description" });
       item.createEl("div", { text: `依据：${issue.basis}`, cls: "setting-item-description" });

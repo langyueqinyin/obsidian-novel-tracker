@@ -13,6 +13,18 @@
   padding: 8px 0;
   border-bottom: 1px solid var(--background-modifier-border);
 }
+.novel-tracker-issue-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.novel-tracker-issue-head strong {
+  flex: 1;
+}
+.novel-tracker-ignore-btn {
+  font-size: var(--font-ui-smaller);
+  flex-shrink: 0;
+}
 
 .novel-tracker-suggest-title {
   font-weight: 600;

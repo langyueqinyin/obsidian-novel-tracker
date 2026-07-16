@@ -459,6 +459,25 @@ export function updateBeats(
   return updated;
 }
 
+/** 往踩点清单的某章小节追加一个情节点（小节不存在则创建） */
+export function addBeat(
+  content: string,
+  sectionName: string,
+  beat: string,
+  note = ""
+): string {
+  const { table, offset } = parseBeats(content, sectionName);
+  if (table) {
+    const lines = content.split("\n");
+    lines.splice(table.lastLine + offset + 1, 0, `| ${beat} | 待踩 | ${note} |`);
+    return lines.join("\n");
+  }
+  return (
+    content.trimEnd() +
+    `\n\n## ${sectionName}\n\n| 情节点 | 状态 | 备注 |\n|---|---|---|\n| ${beat} | 待踩 | ${note} |\n`
+  );
+}
+
 /* --- 灵感收集箱 --- */
 
 const INBOX_DONE_PREFIX = "[已处理]";

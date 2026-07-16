@@ -8,6 +8,7 @@ import { findProject } from "./project";
 import { createProvider } from "./llm";
 import { NewProjectModal, deepenWorldbookQuestions } from "./scaffold";
 import { insertPersonaReference } from "./persona-insert";
+import { upgradeCharacterCard } from "./card-upgrade";
 import { runTrack } from "./track";
 import { TrackReviewModal } from "./ui/review-modal";
 import { runConsistencyCheck } from "./consistency";
@@ -73,6 +74,12 @@ export default class NovelTrackerPlugin extends Plugin {
       id: "insert-persona",
       name: "插入人格参考（八维排序 + 九型简述）",
       callback: () => insertPersonaReference(this),
+    });
+
+    this.addCommand({
+      id: "upgrade-character-card",
+      name: "补全角色卡模板区块（旧卡迁移）",
+      callback: () => upgradeCharacterCard(this),
     });
 
     this.addCommand({
@@ -207,6 +214,7 @@ export default class NovelTrackerPlugin extends Plugin {
     this.settings.llm = Object.assign({}, DEFAULT_SETTINGS.llm, this.settings.llm);
     // 避免与 DEFAULT_SETTINGS 共享同一个对象引用
     this.settings.chatThreads = Object.assign({}, this.settings.chatThreads);
+    this.settings.consistencyIgnores = Object.assign({}, this.settings.consistencyIgnores);
   }
 
   async saveSettings() {
@@ -214,8 +222,18 @@ export default class NovelTrackerPlugin extends Plugin {
   }
 
   async openChat(mode: "inspiration" | "chapter") {
-    const ctx = this.getActiveContext();
-    if (!ctx?.project) return;
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      new Notice("请先打开一个文件");
+      return;
+    }
+    // 聊剧情不要求文件属于项目：单文件小说/任意笔记也能聊（只喂本文）；
+    // 整理灵感依赖灵感收集箱，仍需要项目。
+    const project = findProject(this.app, file);
+    if (mode === "inspiration" && !project) {
+      new Notice("整理灵感需要小说项目（附近找不到 项目档案.md）");
+      return;
+    }
     let leaf = this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)[0];
     if (!leaf) {
       leaf = this.app.workspace.getRightLeaf(false)!;
@@ -224,8 +242,8 @@ export default class NovelTrackerPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
     const view = leaf.view;
     if (view instanceof NovelChatView) {
-      if (mode === "inspiration") await view.openInspiration(ctx.project);
-      else await view.openChapterThread(ctx.project, ctx.file);
+      if (mode === "inspiration") await view.openInspiration(project!);
+      else await view.openChapterThread(project, file);
     }
   }
 

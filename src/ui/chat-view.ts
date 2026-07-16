@@ -9,7 +9,9 @@ import {
   extractSection,
 } from "../project";
 import { ChatMessage } from "../llm";
-import { parseForeshadow } from "../trackers";
+import { parseForeshadow, addBeat, modifyFile } from "../trackers";
+import { chapterLabel } from "../track";
+import { reportSaveDir } from "../project";
 import {
   gatherInspirationContext,
   archiveInboxItems,
@@ -61,10 +63,10 @@ export interface StoredThread {
 
 const MAX_THREADS = 30;
 
-const SYSTEM_CHAPTER = `你是长篇小说作者的剧情陪聊，围绕"当前这一章"展开：聊走向、核对逻辑、推演卡点。
+const SYSTEM_CHAPTER = `你是小说作者的剧情陪聊，围绕"当前这篇文稿"展开：聊走向、核对逻辑、推演卡点。
 
 原则：
-1. 项目档案（bible）里的底层设定与底层真相是最高事实基准，推演不能与之冲突；「阁楼仓库」里的条目是开放问题，可以一起探讨但别当成定论
+1. 若背景资料里提供了项目档案（bible），其中的底层设定与底层真相是最高事实基准，推演不能与之冲突；「阁楼仓库」里的条目是开放问题，可以一起探讨但别当成定论。若没提供 bible，以文稿本身为准
 2. 不替作者写正文。作者要的是推演和讨论：用"这个角色在这个处境下会怎么做"来展开，引用人物关系模式和角色设定作为依据
 3. 给可能性而不是唯一答案：卡点处展示 2-3 条不同走向，各自说明哪个角色逻辑支撑它、会把故事带向哪里
 4. 如果作者的困境是"两个都想要"，帮她看清两个选项各自的代价
@@ -98,12 +100,18 @@ export class NovelChatView extends ItemView {
     super(leaf);
     this.plugin = plugin;
 
-    // 主编辑区切换章节 → 自动切到该章节的聊天串（不抢焦点、不新开面板）
+    // 主编辑区切换文件 → 自动切到对应聊天串（不抢焦点、不新开面板）：
+    // 已有串的任何文件都会跟随；项目正文里的章节即使没有串也会静默新建；
+    // 其他文件不自动建串（避免随手翻笔记就把串位挤掉），要聊就手动跑命令。
     this.registerEvent(
       this.plugin.app.workspace.on("file-open", (file) => {
         if (!file || file.extension !== "md") return;
         if (this.thread?.filePath === file.path) return;
         const project = findProject(this.plugin.app, file);
+        if (this.store[file.path]) {
+          this.openChapterThread(project, file, { silent: true });
+          return;
+        }
         if (!project) return;
         const chaptersPrefix = projectPath(project, project.chaptersDir) + "/";
         const titlePage = projectPath(project, project.titlePagePath);
@@ -134,9 +142,9 @@ export class NovelChatView extends ItemView {
     await this.plugin.saveSettings();
   }
 
-  /** 打开（或创建）某章节的聊天串 */
+  /** 打开（或创建）某文件的聊天串（project 可为 null：单文件小说/任意笔记也能聊） */
   async openChapterThread(
-    project: ProjectConfig,
+    project: ProjectConfig | null,
     file: TFile,
     opt: { silent?: boolean } = {}
   ) {
@@ -150,7 +158,7 @@ export class NovelChatView extends ItemView {
         key: file.path,
         title: file.basename,
         mode: "chapter",
-        projectRoot: project.root,
+        projectRoot: project?.root ?? "",
         filePath: file.path,
         context: "",
         contextDesc: "",
@@ -219,10 +227,24 @@ export class NovelChatView extends ItemView {
   private async buildChapterContext(): Promise<{ text: string; desc: string[] }> {
     const app = this.plugin.app;
     const t = this.thread!;
-    const project = this.project!;
+    const project = this.project;
     const opts = t.ctxOpts;
     const parts: string[] = [];
     const desc: string[] = [];
+
+    if (opts.chapter !== "none" && t.filePath) {
+      const f = app.vault.getFileByPath(t.filePath);
+      if (f) {
+        const text = await app.vault.read(f);
+        const body = opts.chapter === "full" ? text : text.slice(-4000);
+        parts.push(`# 当前文稿（${t.title}${opts.chapter === "tail" ? "，末尾部分" : ""}）\n${body}`);
+        desc.push(opts.chapter === "full" ? `本文全文(${(text.length / 1000).toFixed(1)}k字)` : "本文末尾");
+      }
+    }
+    if (!project) {
+      // 无项目：只有文稿本身可喂
+      return { text: parts.join("\n\n"), desc };
+    }
 
     if (opts.bible) {
       const bible = await app.vault.read(project.bibleFile);
@@ -235,15 +257,6 @@ export class NovelChatView extends ItemView {
         const text = await app.vault.read(outline);
         parts.push(`# 大纲\n${text.slice(0, 6000)}`);
         desc.push("大纲");
-      }
-    }
-    if (opts.chapter !== "none" && t.filePath) {
-      const f = app.vault.getFileByPath(t.filePath);
-      if (f) {
-        const text = await app.vault.read(f);
-        const body = opts.chapter === "full" ? text : text.slice(-4000);
-        parts.push(`# 当前章节（${t.title}${opts.chapter === "tail" ? "，末尾部分" : ""}）\n${body}`);
-        desc.push(opts.chapter === "full" ? `本章全文(${(text.length / 1000).toFixed(1)}k字)` : "本章末尾");
       }
     }
     if (opts.foreshadow) {
@@ -391,11 +404,15 @@ export class NovelChatView extends ItemView {
           el.classList.toggle("off", !get());
         });
       };
-      chip("Bible", () => this.pendingCtxOpts.bible, (v) => (this.pendingCtxOpts.bible = v));
-      chip("大纲", () => this.pendingCtxOpts.outline, (v) => (this.pendingCtxOpts.outline = v));
-      // 本章正文三态
+      const inProject = !!this.project;
+      if (inProject) {
+        chip("Bible", () => this.pendingCtxOpts.bible, (v) => (this.pendingCtxOpts.bible = v));
+        chip("大纲", () => this.pendingCtxOpts.outline, (v) => (this.pendingCtxOpts.outline = v));
+      }
+      // 本章/本文正文三态
+      const unit = inProject ? "本章" : "本文";
       const chapterChip = ctxBar.createEl("span", { cls: "chip" });
-      const chapterLabels = { full: "本章全文", tail: "本章末尾", none: "不带本章" } as const;
+      const chapterLabels = { full: `${unit}全文`, tail: `${unit}末尾`, none: `不带${unit}` } as const;
       const syncChapterChip = () => {
         chapterChip.setText(chapterLabels[this.pendingCtxOpts.chapter]);
         chapterChip.classList.toggle("off", this.pendingCtxOpts.chapter === "none");
@@ -407,9 +424,11 @@ export class NovelChatView extends ItemView {
         this.pendingCtxOpts.chapter = next;
         syncChapterChip();
       });
-      chip("伏笔", () => this.pendingCtxOpts.foreshadow, (v) => (this.pendingCtxOpts.foreshadow = v));
-      chip("时间线", () => this.pendingCtxOpts.timeline, (v) => (this.pendingCtxOpts.timeline = v));
-      chip("角色快照", () => this.pendingCtxOpts.snapshots, (v) => (this.pendingCtxOpts.snapshots = v));
+      if (inProject) {
+        chip("伏笔", () => this.pendingCtxOpts.foreshadow, (v) => (this.pendingCtxOpts.foreshadow = v));
+        chip("时间线", () => this.pendingCtxOpts.timeline, (v) => (this.pendingCtxOpts.timeline = v));
+        chip("角色快照", () => this.pendingCtxOpts.snapshots, (v) => (this.pendingCtxOpts.snapshots = v));
+      }
     } else {
       ctxBar.createEl("span", {
         text: `背景：${t.contextDesc || "（无）"}`,
@@ -424,9 +443,9 @@ export class NovelChatView extends ItemView {
     }
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
 
-    // 灵感模式的动作按钮
+    // 动作按钮
+    const actions = container.createDiv({ cls: "novel-tracker-chat-actions" });
     if (t.mode === "inspiration" && this.project) {
-      const actions = container.createDiv({ cls: "novel-tracker-chat-actions" });
       this.actionButton(actions, "选中文字→存为梗", async () => {
         const text = this.getSelectionOrLastReply();
         if (text) await saveAsPlotIdea(this.plugin, this.project!, text.slice(0, 200));
@@ -439,6 +458,20 @@ export class NovelChatView extends ItemView {
         await archiveInboxItems(this.plugin, this.project!, t.inboxLines ?? []);
         new Notice(`已归档 ${t.inboxLines?.length ?? 0} 条灵感`);
       });
+    }
+    if (t.mode === "chapter" && this.project) {
+      this.actionButton(actions, "选中→存为踩点", async () => {
+        const text = this.getSelectionOrLastReply();
+        if (!text) return;
+        await this.saveAsBeat(text.slice(0, 120));
+      });
+      this.actionButton(actions, "选中→存为梗", async () => {
+        const text = this.getSelectionOrLastReply();
+        if (text) await saveAsPlotIdea(this.plugin, this.project!, text.slice(0, 200), `来自${t.title}的聊天`);
+      });
+    }
+    if (t.history.length > 0) {
+      this.actionButton(actions, "导出本串", () => this.exportThread());
     }
 
     // 输入区
@@ -469,6 +502,49 @@ export class NovelChatView extends ItemView {
     } else {
       el.setText(content);
     }
+  }
+
+  /** 把聊天里选中的结论存为当前章的踩点 */
+  private async saveAsBeat(beat: string) {
+    if (!this.project || !this.thread?.filePath) return;
+    const beatsFile = getTrackerFile(this.plugin.app, this.project, "beats");
+    if (!beatsFile) return void new Notice("找不到踩点清单");
+    const f = this.plugin.app.vault.getFileByPath(this.thread.filePath);
+    const label = f ? chapterLabel(f) : this.thread.title;
+    await modifyFile(this.plugin.app, beatsFile, (c) =>
+      addBeat(c, label, beat, "来自聊天")
+    );
+    new Notice(`已存入踩点清单「${label}」小节`);
+  }
+
+  /** 导出当前聊天串为 md 笔记 */
+  private async exportThread() {
+    const t = this.thread;
+    if (!t || t.history.length === 0) return;
+    const app = this.plugin.app;
+    const stamp = new Date().toISOString().slice(0, 10);
+    const lines = [
+      `# 聊天存档 · ${t.title}`,
+      "",
+      `- 日期：${stamp}`,
+      `- 背景：${t.contextDesc || "（无）"}`,
+      "",
+      "---",
+      "",
+    ];
+    for (const m of t.history) {
+      lines.push(m.role === "user" ? `**我：**` : `**AI：**`, "", m.content, "");
+    }
+    const safeTitle = t.title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+    const dir = this.project
+      ? reportSaveDir(app, this.project)
+      : t.filePath?.split("/").slice(0, -1).join("/") || "";
+    let path = `${dir ? dir + "/" : ""}聊天存档_${safeTitle}_${stamp}.md`;
+    if (app.vault.getFileByPath(path)) {
+      path = path.replace(/\.md$/, `_${Date.now() % 100000}.md`);
+    }
+    await app.vault.create(path, lines.join("\n"));
+    new Notice(`已导出：${path}`, 6000);
   }
 
   private actionButton(parent: HTMLElement, label: string, fn: () => Promise<void>) {

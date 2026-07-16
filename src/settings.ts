@@ -8,6 +8,8 @@ export interface NovelTrackerSettings {
   llm: LLMConfig;
   /** 对话面板的聊天串（按文件路径/项目 key 持久化，最多保留最近 30 串） */
   chatThreads: Record<string, StoredThread>;
+  /** 一致性检查里作者点过「忽略」的条目，按项目根路径分组，检查时告知模型不要再报 */
+  consistencyIgnores: Record<string, string[]>;
 }
 
 export const DEFAULT_SETTINGS: NovelTrackerSettings = {
@@ -19,6 +21,7 @@ export const DEFAULT_SETTINGS: NovelTrackerSettings = {
     maxTokens: 8192,
   },
   chatThreads: {},
+  consistencyIgnores: {},
 };
 
 export class NovelTrackerSettingTab extends PluginSettingTab {
