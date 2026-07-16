@@ -31,20 +31,28 @@ export interface LLMConfig {
   maxTokens: number;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * 对限流(429)/服务端错误(5xx)/网络故障自动重试一次。
- * 批量 Track 连跑几十章时，单次网络抖动不该废掉一整章。
+ * 对限流(429)/服务端错误(5xx，含 529 Overloaded)/网络故障自动重试。
+ * 指数退避 + 抖动，最多 4 次尝试。服务器过载时单次重试往往还撞在高峰上，
+ * 所以给够次数和间隔（约 2s → 4s → 8s）。
  */
-export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (e) {
-    const msg = String((e as Error)?.message ?? e);
-    const retriable = /\b(429|5\d\d)\b|timeout|network|fetch|socket|ECONN|ETIMEDOUT/i.test(msg);
-    if (!retriable) throw e;
-    await new Promise((r) => setTimeout(r, 2500));
-    return fn();
+export async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const msg = String((e as Error)?.message ?? e);
+      const retriable = /\b(429|5\d\d)\b|overloaded|timeout|network|fetch|socket|ECONN|ETIMEDOUT/i.test(msg);
+      if (!retriable || attempt === maxAttempts) throw e;
+      // 2^attempt 秒 + 0-1s 抖动
+      await sleep(Math.pow(2, attempt) * 1000 + Math.random() * 1000);
+    }
   }
+  throw lastErr;
 }
 
 /** 从模型回复中提取 JSON（容忍 markdown 代码块包裹和前后闲话） */
