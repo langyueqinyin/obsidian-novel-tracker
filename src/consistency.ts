@@ -1,7 +1,7 @@
 import { Modal, Notice, Setting, TFile } from "obsidian";
 import type NovelTrackerPlugin from "./main";
 import { ProjectConfig, projectPath, getTrackerFile, reportSaveDir, listCharacters, extractSection } from "./project";
-import { createProvider, extractJson } from "./llm";
+import { extractJson } from "./llm";
 import { chapterLabel } from "./track";
 
 interface ConsistencyIssue {
@@ -67,7 +67,7 @@ ${cards.join("\n\n").slice(0, 8000)}
 # 待校对章节（${chapterLabel(chapter)}）
 ${chapterText}`;
 
-    const provider = createProvider(plugin.settings.llm);
+    const provider = plugin.llm();
     const reply = await provider.complete({
       system: SYSTEM,
       messages: [{ role: "user", content: user }],

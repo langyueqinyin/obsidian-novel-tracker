@@ -1,10 +1,13 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type NovelTrackerPlugin from "./main";
 import { LLMConfig } from "./llm";
-import { createProvider } from "./llm";
+
+import type { StoredThread } from "./ui/chat-view";
 
 export interface NovelTrackerSettings {
   llm: LLMConfig;
+  /** 对话面板的聊天串（按文件路径/项目 key 持久化，最多保留最近 30 串） */
+  chatThreads: Record<string, StoredThread>;
 }
 
 export const DEFAULT_SETTINGS: NovelTrackerSettings = {
@@ -15,6 +18,7 @@ export const DEFAULT_SETTINGS: NovelTrackerSettings = {
     model: "claude-sonnet-5",
     maxTokens: 8192,
   },
+  chatThreads: {},
 };
 
 export class NovelTrackerSettingTab extends PluginSettingTab {
@@ -106,7 +110,7 @@ export class NovelTrackerSettingTab extends PluginSettingTab {
         b.setButtonText("测试").onClick(async () => {
           b.setDisabled(true).setButtonText("测试中…");
           try {
-            const provider = createProvider(this.plugin.settings.llm);
+            const provider = this.plugin.llm();
             const reply = await provider.complete({
               system: "你是连接测试器。只回复「连接成功」四个字。",
               messages: [{ role: "user", content: "测试" }],

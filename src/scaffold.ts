@@ -7,7 +7,6 @@ import {
   TRACKER_TEMPLATES,
 } from "./templates";
 import { BIBLE_FILENAME } from "./project";
-import { createProvider } from "./llm";
 
 export class NewProjectModal extends Modal {
   private name = "";
@@ -109,7 +108,7 @@ export async function deepenWorldbookQuestions(plugin: NovelTrackerPlugin): Prom
   const bibleContent = await plugin.app.vault.read(project.bibleFile);
   const notice = new Notice("正在生成针对性引导问题…", 0);
   try {
-    const provider = createProvider(plugin.settings.llm);
+    const provider = plugin.llm();
     const reply = await provider.complete({
       system:
         "你是小说世界观设计顾问。根据用户提供的项目档案（题材与简介），生成 5-8 个针对该题材的世界观引导问题，" +

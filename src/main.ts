@@ -5,6 +5,7 @@ import {
   NovelTrackerSettingTab,
 } from "./settings";
 import { findProject } from "./project";
+import { createProvider } from "./llm";
 import { NewProjectModal, deepenWorldbookQuestions } from "./scaffold";
 import { insertPersonaReference } from "./persona-insert";
 import { runTrack } from "./track";
@@ -25,10 +26,36 @@ import { openBatchTrack } from "./batch";
 
 export default class NovelTrackerPlugin extends Plugin {
   settings: NovelTrackerSettings = DEFAULT_SETTINGS;
+  private sessionUsage = { input: 0, output: 0 };
+  private statusBar: HTMLElement | null = null;
+
+  /** 统一的 LLM 入口：自动累计 token 用量到状态栏 */
+  llm() {
+    return createProvider(this.settings.llm, (u) => {
+      this.sessionUsage.input += u.input;
+      this.sessionUsage.output += u.output;
+      this.updateStatusBar();
+    });
+  }
+
+  private updateStatusBar() {
+    if (!this.statusBar) return;
+    const fmt = (n: number) =>
+      n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+    this.statusBar.setText(
+      `NT ↑${fmt(this.sessionUsage.input)} ↓${fmt(this.sessionUsage.output)} tok`
+    );
+    this.statusBar.setAttr(
+      "aria-label",
+      `Novel Tracker 本次 Obsidian 会话的 token 消耗：输入 ${this.sessionUsage.input}，输出 ${this.sessionUsage.output}`
+    );
+  }
 
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new NovelTrackerSettingTab(this.app, this));
+    this.statusBar = this.addStatusBarItem();
+    this.updateStatusBar();
 
     this.addCommand({
       id: "new-project",
@@ -148,8 +175,8 @@ export default class NovelTrackerPlugin extends Plugin {
 
     this.addCommand({
       id: "stuck-discussion",
-      name: "卡文论道（对话）",
-      callback: () => this.openChat("stuck"),
+      name: "聊剧情 / 卡文论道（当前章节对话）",
+      callback: () => this.openChat("chapter"),
     });
 
     this.addCommand({
@@ -178,13 +205,15 @@ export default class NovelTrackerPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     this.settings.llm = Object.assign({}, DEFAULT_SETTINGS.llm, this.settings.llm);
+    // 避免与 DEFAULT_SETTINGS 共享同一个对象引用
+    this.settings.chatThreads = Object.assign({}, this.settings.chatThreads);
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
   }
 
-  async openChat(mode: "inspiration" | "stuck") {
+  async openChat(mode: "inspiration" | "chapter") {
     const ctx = this.getActiveContext();
     if (!ctx?.project) return;
     let leaf = this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)[0];
@@ -195,7 +224,8 @@ export default class NovelTrackerPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
     const view = leaf.view;
     if (view instanceof NovelChatView) {
-      await view.startSession(mode, ctx.project, ctx.file);
+      if (mode === "inspiration") await view.openInspiration(ctx.project);
+      else await view.openChapterThread(ctx.project, ctx.file);
     }
   }
 

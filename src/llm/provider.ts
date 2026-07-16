@@ -11,6 +11,13 @@ export interface LLMRequest {
   jsonMode?: boolean;
 }
 
+export interface LLMUsage {
+  input: number;
+  output: number;
+}
+
+export type UsageCallback = (usage: LLMUsage) => void;
+
 export interface LLMProvider {
   readonly name: string;
   complete(req: LLMRequest): Promise<string>;
@@ -22,6 +29,22 @@ export interface LLMConfig {
   baseUrl: string;
   model: string;
   maxTokens: number;
+}
+
+/**
+ * 对限流(429)/服务端错误(5xx)/网络故障自动重试一次。
+ * 批量 Track 连跑几十章时，单次网络抖动不该废掉一整章。
+ */
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    const retriable = /\b(429|5\d\d)\b|timeout|network|fetch|socket|ECONN|ETIMEDOUT/i.test(msg);
+    if (!retriable) throw e;
+    await new Promise((r) => setTimeout(r, 2500));
+    return fn();
+  }
 }
 
 /** 从模型回复中提取 JSON（容忍 markdown 代码块包裹和前后闲话） */
@@ -50,5 +73,5 @@ export function extractJson(text: string): unknown {
       }
     }
   }
-  throw new Error("JSON 括号不配平，模型输出可能被截断");
+  throw new Error("JSON 括号不配平，模型输出可能被截断（可在设置里调大 max_tokens）");
 }

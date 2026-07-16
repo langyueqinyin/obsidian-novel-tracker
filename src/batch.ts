@@ -87,7 +87,17 @@ class BatchTrackModal extends Modal {
     });
 
     new Setting(contentEl)
-      .addButton((b) => b.setButtonText("取消").onClick(() => this.close()))
+      .addButton((b) => {
+        b.setButtonText("取消").onClick(() => {
+          if (this.running) {
+            this.cancelled = true;
+            b.setButtonText("停下中…（跑完当前章即停）").setDisabled(true);
+          } else {
+            this.close();
+          }
+        });
+        this.cancelBtn = b.buttonEl;
+      })
       .addButton((b) =>
         b
           .setButtonText("开始批量 Track")
@@ -96,12 +106,15 @@ class BatchTrackModal extends Modal {
       );
   }
 
+  private cancelBtn: HTMLButtonElement | null = null;
+
   private async run(btn: HTMLButtonElement) {
     if (this.running) return;
     this.running = true;
     const targets = this.pending.filter((_, i) => this.selected[i]);
     btn.setText("跑批中…（关掉这个窗口不会中断）");
     btn.disabled = true;
+    if (this.cancelBtn) this.cancelBtn.setText("停止");
 
     const reportLines: string[] = [
       `# 批量 Track 报告 · ${new Date().toLocaleString("zh-CN")}`,
@@ -145,6 +158,9 @@ class BatchTrackModal extends Modal {
     }
 
     progress.hide();
+    if (this.cancelled) {
+      reportLines.push("---", "", `（用户手动停止，剩余 ${targets.length - ok - failed} 章未处理）`, "");
+    }
     const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "");
     const path = `${reportSaveDir(this.plugin.app, this.project)}/批量Track报告_${stamp}.md`;
     const report = reportLines.join("\n");

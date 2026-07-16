@@ -1,14 +1,14 @@
-import { LLMConfig, LLMProvider } from "./provider";
+import { LLMConfig, LLMProvider, UsageCallback } from "./provider";
 import { AnthropicProvider } from "./anthropic";
 import { OpenAICompatProvider } from "./openai-compat";
 
-export function createProvider(config: LLMConfig): LLMProvider {
+export function createProvider(config: LLMConfig, onUsage?: UsageCallback): LLMProvider {
   if (!config.apiKey) {
     throw new Error("尚未配置 API key，请到插件设置里填写");
   }
   return config.provider === "anthropic"
-    ? new AnthropicProvider(config)
-    : new OpenAICompatProvider(config);
+    ? new AnthropicProvider(config, onUsage)
+    : new OpenAICompatProvider(config, onUsage);
 }
 
 export * from "./provider";

@@ -1,7 +1,6 @@
 import { Notice } from "obsidian";
 import type NovelTrackerPlugin from "./main";
 import { ProjectConfig, getTrackerFile, extractSection } from "./project";
-import { createProvider } from "./llm";
 import { modifyFile } from "./trackers";
 
 /** 归纳读者反馈：读评论存档区 → LLM 归纳 → 更新归纳区 */
@@ -22,7 +21,7 @@ export async function summarizeFeedback(
   const bible = await app.vault.read(project.bibleFile);
   const notice = new Notice("归纳读者反馈中…", 0);
   try {
-    const provider = createProvider(plugin.settings.llm);
+    const provider = plugin.llm();
     const reply = await provider.complete({
       system:
         "你是读者反馈分析师。归纳这批小说读者评论：\n" +

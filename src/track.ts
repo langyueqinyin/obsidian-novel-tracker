@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from "obsidian";
+import { App, Notice, TFile, TFolder } from "obsidian";
 import type NovelTrackerPlugin from "./main";
 import {
   ProjectConfig,
@@ -8,7 +8,7 @@ import {
   listCharacters,
   extractSection,
 } from "./project";
-import { createProvider, extractJson } from "./llm";
+import { extractJson } from "./llm";
 import {
   parseForeshadow,
   addForeshadow,
@@ -198,7 +198,7 @@ ${ctx.characterCards.slice(0, 6000)}
 # 本章正文（${ctx.label}）
 ${ctx.chapterText}`;
 
-  const provider = createProvider(plugin.settings.llm);
+  const provider = plugin.llm();
   const reply = await provider.complete({
     system: TRACK_SYSTEM,
     messages: [{ role: "user", content: user }],
@@ -333,14 +333,13 @@ export async function applyTrackResult(
     }
   }
 
-  // 2. 新情报 -> 项目里名字含「情报追踪」的文档（如没有则并入知情差）
+  // 2. 新情报 -> 项目里名字含「情报追踪」的文档（设定文件夹下递归找）
   const intel = pick(result.newIntel, sel.newIntel);
   if (intel.length > 0) {
-    const settingsFolder = app.vault.getFolderByPath(
-      projectPath(project, project.settingsDir)
-    );
-    const intelFile = settingsFolder?.children.find(
-      (f): f is TFile => f instanceof TFile && f.name.includes("情报追踪")
+    const intelFile = findFileByName(
+      app,
+      projectPath(project, project.settingsDir),
+      (name) => name.includes("情报追踪")
     );
     if (intelFile) {
       await modifyFile(app, intelFile, (c) => {
@@ -531,4 +530,23 @@ function nextChapterLabel(label: string): string {
   const m = label.match(/第(\d+)章/);
   if (m) return `第${parseInt(m[1], 10) + 1}章`;
   return "下一章";
+}
+
+/** 在某文件夹下递归找第一个文件名满足条件的 md 文件 */
+function findFileByName(
+  app: App,
+  folderPath: string,
+  match: (name: string) => boolean
+): TFile | null {
+  const root = app.vault.getFolderByPath(folderPath);
+  if (!root) return null;
+  const stack = [root];
+  while (stack.length) {
+    const folder = stack.pop()!;
+    for (const child of folder.children) {
+      if (child instanceof TFolder) stack.push(child);
+      else if (child instanceof TFile && match(child.name)) return child;
+    }
+  }
+  return null;
 }

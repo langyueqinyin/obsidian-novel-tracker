@@ -54,7 +54,51 @@
   padding: 6px 8px;
   border-bottom: 1px solid var(--background-modifier-border);
   flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
+.novel-tracker-chat-header select {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-ui-small);
+}
+.novel-tracker-chat-restart {
+  font-size: var(--font-ui-smaller);
+  flex-shrink: 0;
+}
+.novel-tracker-chat-empty {
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.6;
+}
+.novel-tracker-chat-ctxbar {
+  padding: 6px 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+.novel-tracker-ctx-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.novel-tracker-chat-ctxbar .chip {
+  font-size: var(--font-ui-smaller);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  user-select: none;
+}
+.novel-tracker-chat-ctxbar .chip.off {
+  opacity: 0.35;
+}
+.novel-tracker-msg-assistant p:first-child { margin-top: 0; }
+.novel-tracker-msg-assistant p:last-child { margin-bottom: 0; }
 .novel-tracker-chat-messages {
   flex: 1;
   overflow-y: auto;
